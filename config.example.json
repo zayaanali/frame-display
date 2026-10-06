@@ -1,0 +1,16 @@
+{
+  "BUS_API_KEY": "your-bus-tracker-key",
+  "BUSES": [
+    156,
+    22,
+    36
+  ],
+  "TRAINS": [
+    "RED"
+  ],
+  "TRAIN_API_KEY": "your-train-tracker-key",
+  "LOCATION": {
+    "lat": 41.8781,
+    "lon": -87.6298
+  }
+}

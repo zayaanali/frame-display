@@ -1,0 +1,46 @@
+{
+  "use": [
+    {
+      "name": "Chicken thighs",
+      "qty": "2 lb"
+    },
+    {
+      "name": "Heavy cream"
+    },
+    {
+      "name": "Arborio rice"
+    },
+    {
+      "name": "Cremini mushrooms",
+      "qty": "1 lb"
+    },
+    {
+      "name": "Cod fillets",
+      "qty": "4"
+    },
+    {
+      "name": "Corn tortillas"
+    },
+    {
+      "name": "Limes",
+      "qty": "3"
+    },
+    {
+      "name": "Cilantro"
+    }
+  ],
+  "make": [
+    {
+      "name": "Chicken tikka masala"
+    },
+    {
+      "name": "Mushroom risotto"
+    },
+    {
+      "name": "Fish tacos"
+    },
+    {
+      "name": "Banana bread"
+    }
+  ]
+}
