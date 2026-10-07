@@ -15,6 +15,7 @@ import path from "node:path";
 import { getDepartures } from "./cta.js";
 import { getSampleDepartures } from "./sample.js";
 import { renderHtml } from "./template.js";
+import { load as loadKitchen } from "./kitchen-store.js";
 
 const { values: args } = parseArgs({
   options: {
@@ -41,7 +42,7 @@ const now = new Date();
 const transit = args.sample
   ? await getSampleDepartures(now)
   : await getDepartures(JSON.parse(await readFile("config.json", "utf8")));
-const kitchen = JSON.parse(await readFile("kitchen.json", "utf8"));
+const kitchen = await loadKitchen();
 const html = renderHtml({ transit, kitchen, now, width, height, fonts });
 
 await mkdir(args.out, { recursive: true });

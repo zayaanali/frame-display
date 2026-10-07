@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>Kitchen</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon.png">
+<style>
+  @font-face { font-family: "Plex Serif"; src: url("/fonts/serif-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+  @font-face { font-family: "Plex Serif"; src: url("/fonts/serif-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+  @font-face { font-family: "Plex Mono"; src: url("/fonts/mono-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+  @font-face { font-family: "Plex Mono"; src: url("/fonts/mono-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+
+  :root { --ink: #000; --paper: #fff; --line: #000; --muted: #555; --tap: 48px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html { background: var(--paper); }
+  body { font-family: "Plex Mono", ui-monospace, monospace; color: var(--ink); background: var(--paper);
+         min-height: 100dvh; overscroll-behavior-y: contain; }
+  button, input { font: inherit; color: inherit; }
+  button { background: none; border: none; cursor: pointer; }
+
+  /* Header: black band with the two lists as tabs, like the display's section bands. */
+  header { position: sticky; top: 0; z-index: 2; background: var(--ink); color: var(--paper);
+           padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px; }
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-width: 560px; margin: 0 auto;
+          border: 2px solid var(--paper); border-radius: 10px; padding: 4px; }
+  .tab { min-height: 44px; border-radius: 6px; font-weight: 700; font-size: 14px; letter-spacing: 0.08em; }
+  .tab[aria-selected="true"] { background: var(--paper); color: var(--ink); }
+  .count { font-weight: 500; opacity: 0.7; margin-left: 4px; }
+
+  main { max-width: 560px; margin: 0 auto; padding: 8px 16px calc(env(safe-area-inset-bottom, 0px) + 110px); }
+  .list { list-style: none; }
+  .item { display: flex; align-items: center; gap: 4px; min-height: 60px; border-bottom: 1px solid var(--line);
+          background: var(--paper); }
+  .handle { flex: none; width: 40px; height: var(--tap); display: grid; place-items: center; touch-action: none;
+            cursor: grab; color: var(--ink); }
+  .handle svg { width: 18px; height: 18px; }
+  .text { flex: 1; min-width: 0; min-height: var(--tap); display: flex; align-items: center; gap: 8px; text-align: left;
+          font-family: "Plex Serif", Georgia, serif; font-size: 19px; font-weight: 500; line-height: 1.25; padding: 6px 0; }
+  .name { overflow-wrap: anywhere; }
+  .qty { flex: none; font-family: "Plex Mono", monospace; font-size: 13px; font-weight: 700;
+         border: 1.5px solid var(--ink); border-radius: 999px; padding: 1px 8px; }
+  .done { flex: none; width: var(--tap); height: var(--tap); display: grid; place-items: center; }
+  .done span { width: 26px; height: 26px; border: 2px solid var(--ink); border-radius: 50%; display: grid; place-items: center; }
+  .done svg { width: 14px; height: 14px; opacity: 0; }
+  .done:active svg, .done.checked svg { opacity: 1; }
+  .done.checked span { background: var(--ink); color: var(--paper); }
+  .item.leaving { opacity: 0; transform: translateX(24px); transition: opacity 0.2s, transform 0.2s; }
+
+  /* Drag states (SortableJS). */
+  .ghost { opacity: 0.25; }
+  .chosen { box-shadow: 0 6px 18px rgba(0,0,0,0.18); border-radius: 8px; }
+
+  /* Inline edit form replaces the row's text. */
+  .edit { flex: 1; display: flex; gap: 6px; padding: 8px 0; flex-wrap: wrap; }
+  .edit input { flex: 1 1 140px; min-width: 0; height: 44px; border: 2px solid var(--ink); border-radius: 8px;
+                padding: 0 10px; font-size: 17px; background: var(--paper); }
+  .edit input[name=name] { font-family: "Plex Serif", Georgia, serif; }
+  .edit input[name=qty] { flex: 0 1 90px; }
+  .edit .row { display: flex; gap: 6px; width: 100%; }
+  .btn { height: 44px; padding: 0 16px; border-radius: 8px; font-weight: 700; font-size: 14px; letter-spacing: 0.04em; }
+  .btn.primary { background: var(--ink); color: var(--paper); }
+  .btn.outline { border: 2px solid var(--ink); }
+
+  .empty { text-align: center; font-family: "Plex Serif", Georgia, serif; font-style: italic; font-size: 18px;
+           color: var(--muted); padding: 48px 0; }
+  .hint { font-size: 12px; color: var(--muted); text-align: center; padding: 16px 0 0; letter-spacing: 0.02em; }
+
+  /* Add bar pinned to the bottom, above the home indicator. */
+  .add { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; background: var(--paper);
+         border-top: 2px solid var(--ink); padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 10px); }
+  .add form { display: flex; gap: 8px; max-width: 560px; margin: 0 auto; }
+  .add input { min-width: 0; height: 48px; border: 2px solid var(--ink); border-radius: 10px; padding: 0 12px;
+               font-size: 17px; background: var(--paper); }
+  .add input[name=name] { flex: 1; font-family: "Plex Serif", Georgia, serif; }
+  .add input[name=qty] { width: 76px; flex: none; }
+  .add .btn { height: 48px; border-radius: 10px; }
+
+  .toast { position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); z-index: 3;
+           max-width: 528px; margin: 0 auto; background: var(--ink); color: var(--paper); border-radius: 10px;
+           display: flex; align-items: center; gap: 12px; padding: 6px 6px 6px 14px; font-size: 14px; }
+  .toast span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .toast button { color: var(--paper); font-weight: 700; letter-spacing: 0.06em; min-height: 40px; padding: 0 12px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-list="use" aria-selected="true">TO USE<span class="count" id="count-use"></span></button>
+    <button class="tab" role="tab" data-list="make" aria-selected="false">TO MAKE<span class="count" id="count-make"></span></button>
+  </div>
+</header>
+
+<main>
+  <ul class="list" id="list"></ul>
+  <p class="empty" id="empty" hidden></p>
+  <p class="hint" id="hint" hidden>Drag ≡ to reorder · tap to edit · ○ when done</p>
+</main>
+
+<div class="add">
+  <form id="add-form" autocomplete="off">
+    <input name="name" placeholder="Add…" enterkeyhint="done" required maxlength="80">
+    <input name="qty" placeholder="Qty" enterkeyhint="done" maxlength="20">
+    <button class="btn primary" type="submit">ADD</button>
+  </form>
+</div>
+
+<div class="toast" id="toast" hidden><span id="toast-text"></span><button id="toast-action" hidden>UNDO</button></div>
+
+<script src="/sortable.js"></script>
+<script>
+const LABELS = {
+  use: { placeholder: "Add an ingredient…", empty: "Nothing to use up.", qty: true },
+  make: { placeholder: "Add a recipe…", empty: "Nothing planned.", qty: false },
+};
+const GRIP = '<svg viewBox="0 0 18 18" fill="currentColor"><rect x="2" y="4" width="14" height="2" rx="1"/><rect x="2" y="8" width="14" height="2" rx="1"/><rect x="2" y="12" width="14" height="2" rx="1"/></svg>';
+const CHECK = '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 7.5l3 3 7-7"/></svg>';
+
+const $ = (id) => document.getElementById(id);
+const listEl = $("list");
+const form = $("add-form");
+const addName = form.querySelector("[name=name]");
+const addQty = form.querySelector("[name=qty]");
+
+let data = { use: [], make: [] };
+let current = "use";
+let editingId = null;   // while editing or dragging, incoming syncs don't redraw the list
+let dragging = false;
+
+try { current = localStorage.getItem("tab") === "make" ? "make" : "use"; } catch {}
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+// --- API ----------------------------------------------------------------------
+
+async function api(method, path, body) {
+  const res = await fetch(`/api/${path}`, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
+  return json;
+}
+
+// Applies a change: server returns the full state, which replaces ours.
+async function change(method, path, body) {
+  try {
+    data = await api(method, path, body);
+  } catch (err) {
+    toast(err.message === "Failed to fetch" ? "Couldn't reach the fridge. Check Wi-Fi." : err.message);
+    await sync();
+  }
+  render();
+}
+
+async function sync() {
+  if (editingId || dragging) return;
+  try {
+    data = await api("GET", "kitchen");
+    render();
+  } catch {}
+}
+
+// --- rendering ------------------------------------------------------------------
+
+function render() {
+  for (const list of ["use", "make"]) $(`count-${list}`).textContent = data[list].length || "";
+  for (const tab of document.querySelectorAll(".tab")) tab.setAttribute("aria-selected", tab.dataset.list === current);
+  const items = data[current];
+  const cfg = LABELS[current];
+  addName.placeholder = cfg.placeholder;
+  addQty.hidden = !cfg.qty;
+  $("empty").textContent = cfg.empty;
+  $("empty").hidden = items.length > 0;
+  $("hint").hidden = items.length === 0;
+  listEl.innerHTML = items.map((item) => item.id === editingId ? editRow(item) : row(item)).join("");
+  const input = listEl.querySelector(".edit input[name=name]");
+  if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+}
+
+function row(item) {
+  return `<li class="item" data-id="${item.id}">
+    <span class="handle" aria-label="Drag to reorder">${GRIP}</span>
+    <button class="text" data-action="edit"><span class="name">${esc(item.name)}</span>${item.qty ? `<span class="qty">${esc(item.qty)}</span>` : ""}</button>
+    <button class="done" data-action="done" aria-label="Done with ${esc(item.name)}"><span>${CHECK}</span></button>
+  </li>`;
+}
+
+function editRow(item) {
+  return `<li class="item" data-id="${item.id}">
+    <form class="edit" data-action="save">
+      <div class="row">
+        <input name="name" value="${esc(item.name)}" required maxlength="80" enterkeyhint="done">
+        ${LABELS[current].qty ? `<input name="qty" value="${esc(item.qty ?? "")}" placeholder="Qty" maxlength="20" enterkeyhint="done">` : ""}
+      </div>
+      <div class="row">
+        <button class="btn primary" type="submit">SAVE</button>
+        <button class="btn outline" type="button" data-action="cancel">CANCEL</button>
+      </div>
+    </form>
+  </li>`;
+}
+
+// --- toast with undo ------------------------------------------------------------
+
+let toastTimer;
+function toast(text, action) {
+  $("toast-text").textContent = text;
+  $("toast-action").hidden = !action;
+  $("toast-action").onclick = () => { $("toast").hidden = true; action(); };
+  $("toast").hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => ($("toast").hidden = true), 5000);
+}
+
+// --- events ---------------------------------------------------------------------
+
+document.querySelector(".tabs").addEventListener("click", (e) => {
+  const tab = e.target.closest(".tab");
+  if (!tab) return;
+  current = tab.dataset.list;
+  editingId = null;
+  try { localStorage.setItem("tab", current); } catch {}
+  render();
+});
+
+listEl.addEventListener("click", async (e) => {
+  const el = e.target.closest("[data-action]");
+  if (!el) return;
+  const li = el.closest(".item");
+  const id = li.dataset.id;
+  const action = el.dataset.action;
+
+  if (action === "edit") { editingId = id; render(); }
+  if (action === "cancel") { editingId = null; render(); }
+  if (action === "done") {
+    const list = current;
+    const index = data[list].findIndex((item) => item.id === id);
+    const item = data[list][index];
+    el.classList.add("checked");
+    li.classList.add("leaving");
+    await new Promise((r) => setTimeout(r, 200));
+    await change("DELETE", `${list}/${id}`);
+    toast(`Removed ${item.name}`, () => change("POST", list, { name: item.name, qty: item.qty, index }));
+  }
+});
+
+listEl.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const id = f.closest(".item").dataset.id;
+  const qty = f.querySelector("[name=qty]");
+  const body = { name: f.querySelector("[name=name]").value };
+  if (qty) body.qty = qty.value;
+  editingId = null;
+  await change("PATCH", `${current}/${id}`, body);
+});
+
+listEl.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && editingId) { editingId = null; render(); }
+});
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = addName.value.trim();
+  if (!name) return;
+  const body = { name };
+  if (!addQty.hidden && addQty.value.trim()) body.qty = addQty.value;
+  form.reset();
+  addName.focus();
+  await change("POST", current, body);
+  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+});
+
+Sortable.create(listEl, {
+  handle: ".handle",
+  animation: 150,
+  ghostClass: "ghost",
+  chosenClass: "chosen",
+  onStart: () => { dragging = true; },
+  onEnd: async (e) => {
+    dragging = false;
+    if (e.oldIndex === e.newIndex) return;
+    const ids = [...listEl.children].map((li) => li.dataset.id);
+    await change("PUT", `${current}/order`, { ids });
+  },
+});
+
+// Keep in step with edits from other phones.
+setInterval(() => document.visibilityState === "visible" && sync(), 15000);
+document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && sync());
+
+render();
+sync();
+</script>
+</body>
+</html>
