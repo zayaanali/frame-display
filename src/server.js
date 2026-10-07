@@ -3,6 +3,11 @@
 // Serves the app at / and a small JSON API under /api. After each change the
 // frame is re-rendered (debounced), so out/frame-bw.png stays current.
 //
+// For the Kindle:
+//   GET /frame.png   the latest rendered frame (8-bit greyscale, as eips needs)
+//   GET /kindle      a bare page showing the frame and reloading every minute,
+//                    for the Kindle's built-in browser (no jailbreak needed)
+//
 // API (every response is the full { use, make } state):
 //   GET    /api/kitchen
 //   POST   /api/:list              { name, qty?, index? }  add (at index, else end)
@@ -35,6 +40,17 @@ const STATIC = {
   "/fonts/mono-500.woff2": [font("ibm-plex-mono", 500), "font/woff2"],
   "/fonts/mono-700.woff2": [font("ibm-plex-mono", 700), "font/woff2"],
 };
+
+const FRAME = "out/frame-bw.png";
+
+// Kept to what the Kindle's old WebKit browser handles: no scripts, meta refresh,
+// and a timestamp on the image URL so it can't show a cached frame.
+const kindlePage = () => `<!doctype html>
+<html><head><meta charset="utf-8"><meta http-equiv="refresh" content="60">
+<meta name="viewport" content="width=600">
+<style>html, body { margin: 0; padding: 0; background: #fff; overflow: hidden; }
+img { display: block; width: 600px; height: 800px; }</style></head>
+<body><img src="/frame.png?t=${Date.now()}" alt=""></body></html>`;
 
 // Home-screen icon in the display's style: a black tile with a serif mark.
 const ICON = await sharp(Buffer.from(`
@@ -169,6 +185,12 @@ createServer(async (req, res) => {
     const match = pathname.match(API_PATH);
     if (match) return send(res, 200, await api(req, match[1], match[2]));
     if (pathname === "/icon.png") return send(res, 200, ICON, "image/png");
+    if (pathname === "/kindle") return send(res, 200, kindlePage(), "text/html; charset=utf-8");
+    if (pathname === "/frame.png") {
+      const png = await readFile(FRAME).catch(() => null);
+      if (!png) throw new HttpError(404, "No frame rendered yet");
+      return send(res, 200, png, "image/png");
+    }
     const file = STATIC[pathname];
     if (file && req.method === "GET") return send(res, 200, await readFile(file[0]), file[1]);
     throw new HttpError(404, "Not found");

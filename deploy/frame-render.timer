@@ -1,0 +1,11 @@
+# Re-renders the frame at the start of every minute so departure times stay current.
+[Unit]
+Description=Fridge display: render every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=1s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

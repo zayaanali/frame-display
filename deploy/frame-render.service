@@ -1,0 +1,13 @@
+# Renders out/frame-bw.png once (live CTA times + kitchen lists).
+# Started every minute by frame-render.timer.
+[Unit]
+Description=Fridge display: render frame
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/frame-gen
+ExecStart=/usr/bin/env node src/render.js
+Environment=TZ=America/Chicago
+TimeoutStartSec=90

@@ -1,0 +1,18 @@
+# Phone web app for the kitchen lists (npm run app).
+# User service: copy to ~/.config/systemd/user/ — see deploy/README.md.
+[Unit]
+Description=Fridge display: kitchen web app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=%h/frame-gen
+ExecStart=/usr/bin/env node src/server.js
+Environment=PORT=8080
+# The display's clock uses the process time zone; servers often default to UTC.
+Environment=TZ=America/Chicago
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
