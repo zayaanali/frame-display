@@ -28,16 +28,21 @@ const width = Number(args.width);
 const height = Number(args.height);
 
 const require = createRequire(import.meta.url);
-const fontUrl = pathToFileURL(
-  require.resolve("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2"),
-).href;
+const face = (family, pkg, weight) => {
+  const file = require.resolve(`${pkg}/files/${pkg.split("/")[1]}-latin-${weight}-normal.woff2`);
+  return `@font-face { font-family: "${family}"; src: url("${pathToFileURL(file).href}") format("woff2"); font-weight: ${weight}; }`;
+};
+const fonts = [
+  ...[500, 600, 700].map((w) => face("IBM Plex Mono", "@fontsource/ibm-plex-mono", w)),
+  ...[500, 700].map((w) => face("IBM Plex Serif", "@fontsource/ibm-plex-serif", w)),
+].join("\n");
 
 const now = new Date();
 const transit = args.sample
   ? await getSampleDepartures(now)
   : await getDepartures(JSON.parse(await readFile("config.json", "utf8")));
 const kitchen = JSON.parse(await readFile("kitchen.json", "utf8"));
-const html = renderHtml({ transit, kitchen, now, width, height, fontUrl });
+const html = renderHtml({ transit, kitchen, now, width, height, fonts });
 
 await mkdir(args.out, { recursive: true });
 const htmlPath = path.resolve(args.out, "frame.html");

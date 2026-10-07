@@ -1,43 +1,16 @@
-// Builds the HTML for one frame: transit departures on top, the kitchen
-// queue below. Pure black and white only: e-ink panels render greys as
-// dither noise, so contrast comes from weight and size instead.
+// Builds the HTML for one frame: a departure board on top (60%) and the
+// kitchen lists below (40%). Pure black and white only: e-ink panels render
+// greys as dither noise, so contrast comes from weight, size and inverted bands.
+//
+// Type: IBM Plex Serif for anything read at a distance (clock, routes, minute
+// tiles) and for list items; IBM Plex Mono for the small uppercase captions.
 
 const esc = (s) =>
   String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 const minsUntil = (iso, now) => Math.max(0, Math.round((new Date(iso) - now) / 60_000));
 
-const fmtTime = (d) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-const fmtDate = (d) => d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
-
 const ARROW = { North: "↑", South: "↓" };
-
-// --- transit ------------------------------------------------------------------
-
-function direction({ label, toward, departures, error }, now) {
-  const [next, ...later] = departures.map((d) => minsUntil(d, now));
-  const big =
-    next === undefined
-      ? `<span class="none">${error ? "No data" : "No service"}</span>`
-      : next === 0
-        ? '<span class="num">Due</span>'
-        : `<span class="num">${next}</span><span class="unit">min</span>`;
-  return `
-    <div class="dir">
-      <div class="toward"><span class="arrow">${ARROW[label] ?? ""}</span>${esc(toward || `${label}bound`)}</div>
-      <div class="next">${big}${later.length ? `<span class="later">${later.slice(0, 2).join(", ")}</span>` : ""}</div>
-    </div>`;
-}
-
-function line({ id, mode, directions }, now) {
-  return `
-    <div class="line ${mode}">
-      <div class="badge${id.length > 2 ? " long" : ""}">${esc(id)}</div>
-      <div class="dirs">${directions.map((d) => direction(d, now)).join("")}</div>
-    </div>`;
-}
-
-// --- kitchen ------------------------------------------------------------------
 
 // Lists render every item; FIT_LISTS (run in the page once fonts load)
 // drops whatever doesn't fit its column and adds a "+ N more" line instead.
@@ -59,96 +32,95 @@ const FIT_LISTS = `
     }
   });`;
 
-function toMake(list) {
-  if (!list.length) return '<p class="empty">Nothing planned</p>';
-  return `<ol class="list">
-    ${list.map((r) => `<li><span class="item">${esc(r.name)}</span></li>`).join("")}
-  </ol>`;
+// --- transit ------------------------------------------------------------------
+
+function caption({ label, toward }) {
+  return `<div class="toward">${ARROW[label] ?? ""} ${esc(toward || `${label}bound`)}</div>`;
 }
 
-function toUse(list) {
-  if (!list.length) return '<p class="empty">All used up</p>';
-  return `<ul class="list use">
-    ${list.map((g) => `<li><span class="item">${esc(g.name)}</span>${g.qty ? `<span class="qty">${esc(g.qty)}</span>` : ""}</li>`).join("")}
+function times({ departures }, now) {
+  const [next, ...later] = departures.map((d) => minsUntil(d, now));
+  const tile =
+    next === undefined ? '<span class="tile">--</span>'
+      : next === 0 ? '<span class="tile due">DUE</span>'
+        : `<span class="tile">${next}</span>`;
+  // The unit slot is always present (empty for DUE/--) so later times stay aligned.
+  return `<div class="times">${tile}<span class="unit">${next ? "MIN" : ""}</span><span class="later">${later.slice(0, 2).join(" · ")}</span></div>`;
+}
+
+// Each line is a 3x2 grid (captions on the first row, route and minute tiles
+// on the second) so routes line up with their tiles, not with the captions.
+function line({ id, mode, directions }, now) {
+  return `
+    <div class="line ${mode}">
+      <span></span>${directions.map(caption).join("")}
+      <div class="route">${esc(id)}</div>${directions.map((d) => times(d, now)).join("")}
+    </div>`;
+}
+
+// --- kitchen ------------------------------------------------------------------
+
+function list(items, empty) {
+  if (!items.length) return `<p class="empty">${empty}</p>`;
+  return `<ul class="list">
+    ${items.map((i) => `<li>${esc(i.name)}${i.qty ? ` <span class="qty">${esc(i.qty)}</span>` : ""}</li>`).join("")}
   </ul>`;
 }
 
 // --- page ---------------------------------------------------------------------
 
-export function renderHtml({ transit, kitchen, now, width, height, fontUrl }) {
+export function renderHtml({ transit, kitchen, now, width, height, fonts }) {
+  const [time, ampm] = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).split(" ");
+  const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase();
   return `<!doctype html>
-<html><head><meta charset="utf-8"><style>
-  @font-face { font-family: Inter; src: url("${fontUrl}") format("woff2"); font-weight: 100 900; }
+<html><head><meta charset="utf-8"><style>${fonts}
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: ${width}px; height: ${height}px; background: #fff; color: #000; overflow: hidden; }
-  body {
-    font-family: Inter, sans-serif;
-    font-feature-settings: "tnum", "ss01", "cv11";
-    -webkit-font-smoothing: none;
-    display: flex; flex-direction: column;
-    padding: 18px 28px 16px;
-  }
+  body { font-family: "IBM Plex Mono", monospace; font-feature-settings: "tnum", "lnum";
+         -webkit-font-smoothing: none; display: flex; flex-direction: column; }
 
-  header { display: flex; justify-content: space-between; align-items: baseline;
-           padding-bottom: 8px; border-bottom: 4px solid #000; }
-  .time { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
-  .date { font-size: 17px; font-weight: 700; }
+  header { background: #000; color: #fff; display: flex; justify-content: space-between; align-items: center;
+           padding: 12px 24px; }
+  .time { font-family: "IBM Plex Serif", serif; font-size: 36px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+  .ampm { font-size: 15px; font-weight: 700; margin-left: 6px; }
+  .date { font-size: 16px; font-weight: 700; letter-spacing: 0.08em; }
 
-  /* Transit takes 60% of the space under the clock, the kitchen 40%. */
-  .transit { flex: 3 1 0; min-height: 0; display: flex; flex-direction: column; }
-  .line { flex: 1; display: flex; align-items: center; gap: 16px; border-bottom: 2px solid #000; }
+  .transit { flex: 3 1 0; display: flex; flex-direction: column; padding: 0 24px; }
+  .line { flex: 1; display: grid; grid-template-columns: 88px minmax(0,1fr) minmax(0,1fr);
+          align-content: center; align-items: center; row-gap: 6px; border-bottom: 2px dashed #000; }
   .line:last-child { border-bottom: none; }
-  /* Buses get a rounded square, the train a circle, so they read apart at a glance. */
-  .badge { flex: none; width: 70px; height: 70px; background: #000; color: #fff; border-radius: 8px;
-           display: grid; place-items: center; font-size: 32px; font-weight: 800; letter-spacing: -0.03em; }
-  .train .badge { border-radius: 50%; }
-  .badge.long { font-size: 22px; letter-spacing: 0; }
-  .dirs { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .dir { padding-left: 16px; min-width: 0; }
-  .dir + .dir { border-left: 2px solid #000; }
-  .toward { font-size: 16px; font-weight: 700; }
-  .arrow { font-weight: 800; margin-right: 5px; }
-  .next { display: flex; align-items: baseline; gap: 4px; height: 56px; margin-top: 2px; }
-  .num { font-size: 54px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
-  .unit { font-size: 16px; font-weight: 700; }
-  .later { font-size: 16px; font-weight: 500; margin-left: 8px; }
-  .none { font-size: 19px; font-weight: 600; align-self: center; }
+  .route { font-family: "IBM Plex Serif", serif; font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+  .toward { font-size: 13px; font-weight: 700; text-transform: uppercase; white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; padding-left: 12px; }
+  .times { display: flex; align-items: center; gap: 6px; padding-left: 12px; }
+  /* Fixed width so MIN and the later times line up down the board. */
+  .tile { flex: none; width: 56px; height: 44px; display: grid; place-items: center; background: #000; color: #fff;
+          border-radius: 4px; font-family: "IBM Plex Serif", serif; font-size: 30px; font-weight: 700; line-height: 1; }
+  .tile.due { font-size: 19px; }
+  .unit { flex: none; width: 26px; font-size: 12px; font-weight: 700; }
+  .later { font-size: 15px; font-weight: 600; margin-left: 6px; }
 
-    .kitchen { flex: 2 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); grid-template-rows: minmax(0, 1fr);
-             border-top: 4px solid #000; padding-top: 10px; }
-  .col { min-height: 0; overflow: hidden; }
-  .col + .col { border-left: 2px solid #000; padding-left: 18px; }
-  .col:first-child { padding-right: 18px; }
-  h2 { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; line-height: 1;
-       padding-bottom: 6px; border-bottom: 2px solid #000; margin-bottom: 2px; }
+  .kitchen { flex: 2 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+             grid-template-rows: minmax(0,1fr); border-top: 4px solid #000; }
+  .col { min-height: 0; overflow: hidden; padding: 0 24px 16px; }
+  .col + .col { border-left: 4px solid #000; }
+  h2 { background: #000; color: #fff; font-size: 14px; font-weight: 700; letter-spacing: 0.12em;
+       margin: 0 -24px 8px; padding: 7px 24px; }
   .list { list-style: none; }
-  .list li { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
-  .item { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .qty { flex: none; font-size: 14px; font-weight: 500; }
-  .list .more { font-size: 15px; font-weight: 700; }
-
-  /* Stuff to use is outlined pills that wrap; stuff to make is rows split by thin rules. */
-  .list:not(.use) li + li { border-top: 1px solid #000; }
-  .use { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 7px; padding-top: 8px; }
-  .use li { padding: 4px 11px; border: 2px solid #000; border-radius: 999px; gap: 6px; max-width: 100%; }
-  .use .item { flex: 0 1 auto; font-size: 15px; }
-  .use .qty { font-size: 13px; }
-  .use .more { border: none; padding-left: 4px; }
-  .empty { font-size: 17px; font-weight: 600; }
+  .list li { font-family: "IBM Plex Serif", serif; font-size: 17px; font-weight: 500; line-height: 1.2; padding: 4px 0;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list li::before { content: "› "; font-weight: 700; }
+  .list .more { font-family: "IBM Plex Mono", monospace; font-size: 13px; font-weight: 700; }
+  .list .more::before { content: ""; }
+  .qty { font-family: "IBM Plex Mono", monospace; font-size: 13px; font-weight: 600; }
+  .empty { font-family: "IBM Plex Serif", serif; font-size: 17px; font-style: italic; }
 </style></head>
 <body>
-  <header>
-    <div class="time">${fmtTime(now)}</div>
-    <div class="date">${fmtDate(now)}</div>
-  </header>
-
-  <section class="transit">
-    ${transit.lines.map((l) => line(l, now)).join("")}
-  </section>
-
+  <header><span><span class="time">${time}</span><span class="ampm">${ampm}</span></span><span class="date">${date}</span></header>
+  <section class="transit">${transit.lines.map((l) => line(l, now)).join("")}</section>
   <section class="kitchen">
-    <div class="col"><h2>Stuff to use</h2>${toUse(kitchen.use ?? [])}</div>
-    <div class="col"><h2>Stuff to make</h2>${toMake(kitchen.make ?? [])}</div>
+    <div class="col"><h2>STUFF TO USE</h2>${list(kitchen.use ?? [], "All used up")}</div>
+    <div class="col"><h2>STUFF TO MAKE</h2>${list(kitchen.make ?? [], "Nothing planned")}</div>
   </section>
   <script>${FIT_LISTS}</script>
 </body></html>`;

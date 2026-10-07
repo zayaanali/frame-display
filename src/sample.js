@@ -10,38 +10,38 @@ const minutesFromNow = (now, m) => new Date(now.getTime() + m * 60_000).toISOStr
 export async function getSampleDepartures(now = new Date()) {
   const t = (...ms) => ms.map((m) => minutesFromNow(now, m));
   return {
-    stop: { name: "Main St & 5th Ave", code: "Stop 4021" },
+    stop: { name: "Clark & Schiller", code: "Clark/Division station" },
     lines: [
       {
-        id: "12",
+        id: "156",
         mode: "bus",
         directions: [
-          { label: "North", toward: "Northgate", departures: t(2, 14, 29) },
-          { label: "South", toward: "Downtown", departures: t(9, 24, 39) },
+          { label: "North", toward: "Belmont/Halsted", departures: t(5, 13, 22) },
+          { label: "South", toward: "Union Station", departures: t(6, 7) },
         ],
       },
       {
-        id: "7X",
+        id: "22",
         mode: "bus",
         directions: [
-          { label: "North", toward: "University", departures: t(6, 21) },
-          { label: "South", toward: "Transit Ctr", departures: t(0, 15, 30) },
+          { label: "North", toward: "Howard", departures: t(9, 15) },
+          { label: "South", toward: "Harrison", departures: t(15, 18, 20) },
         ],
       },
       {
-        id: "45",
+        id: "36",
         mode: "bus",
         directions: [
-          { label: "North", toward: "Lake City", departures: t(11, 41) },
-          { label: "South", toward: "Airport", departures: [] },
+          { label: "North", toward: "Devon/Clark", departures: t(5, 10, 16) },
+          { label: "South", toward: "LaSalle Metra Station", departures: t(15, 26) },
         ],
       },
       {
-        id: "Red",
+        id: "RED",
         mode: "train",
         directions: [
-          { label: "North", toward: "Lynnwood", departures: t(4, 12, 20) },
-          { label: "South", toward: "Angle Lake", departures: t(7, 15, 23) },
+          { label: "North", toward: "Howard", departures: t(0, 4, 10) },
+          { label: "South", toward: "95th/Dan Ryan", departures: t(2, 10, 12) },
         ],
       },
     ],
