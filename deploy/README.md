@@ -1,8 +1,13 @@
 # Running on a server
 
-The server renders the frame every minute and runs the phone app. The Kindle
-only downloads and shows `/frame.png`. Any always-on Linux machine works
-(64-bit; Playwright's Chromium doesn't run on 32-bit Raspberry Pi OS).
+The server renders the frame every minute and runs the phone app. Screens
+only display what it serves: the Kindle downloads `/frame.png`, a tablet opens
+`/board`. Any always-on Linux machine works (64-bit; Playwright's Chromium
+doesn't run on 32-bit Raspberry Pi OS).
+
+Everything runs headless: Playwright launches Chromium without a window, so
+the server needs no monitor, desktop or X server. Set it up over SSH; the
+services below keep running after you log out.
 
 ## 1. Copy the project over
 
@@ -68,6 +73,21 @@ a shell on the Kindle (KUAL or SSH):
 ```sh
 nohup sh /mnt/us/frame/frame.sh > /dev/null 2>&1 &
 ```
+
+## Tablet
+
+Open `http://SERVER:8080/board` in the tablet's browser. It's the same
+template as the e-ink image, scaled to the screen, and refreshes every 30
+seconds (on the :00 and :30 marks). If the server can't be reached it keeps
+the last board up with an "OFFLINE" tag.
+
+To keep it on screen:
+
+- iPad: Share → Add to Home Screen (opens without browser bars), turn
+  Auto-Lock off in Settings → Display & Brightness, and use Guided Access
+  to lock it to the page.
+- Android: add to home screen from Chrome's menu; set screen timeout to the
+  maximum or use a kiosk browser such as Fully Kiosk.
 
 ## Updating
 

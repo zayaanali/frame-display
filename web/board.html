@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#000000">
+<title>Board</title>
+<style>
+  /* The board itself is /board/frame: the exact HTML the e-ink image is
+     rendered from, at its native 600x800. This page scales it to fit the
+     screen and swaps in a fresh copy every 30 seconds. */
+  html, body { margin: 0; height: 100%; background: #fff; overflow: hidden; }
+  #stage { position: absolute; left: 50%; top: 50%; width: 600px; height: 800px; }
+  iframe { position: absolute; inset: 0; width: 600px; height: 800px; border: 0; background: #fff; }
+  iframe.loading { visibility: hidden; }
+  #offline { position: fixed; right: 12px; bottom: 12px; font: 700 12px/1 ui-monospace, monospace;
+             letter-spacing: 0.08em; background: #000; color: #fff; padding: 6px 8px; border-radius: 4px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="offline" hidden>OFFLINE · SHOWING LAST UPDATE</div>
+<script>
+  var W = 600, H = 800, EVERY = 30000;
+  var stage = document.getElementById("stage");
+  var offline = document.getElementById("offline");
+
+  function fit() {
+    var scale = Math.min(window.innerWidth / W, window.innerHeight / H);
+    stage.style.transform = "translate(-50%, -50%) scale(" + scale + ")";
+  }
+
+  // Load the next board in a hidden iframe and only reveal it once it has
+  // rendered (fonts loaded, lists trimmed), so the screen never flickers.
+  // A failed load keeps the previous board up.
+  function refresh() {
+    var next = document.createElement("iframe");
+    next.className = "loading";
+    next.setAttribute("aria-hidden", "true");
+    next.src = "/board/frame?t=" + Date.now();
+    next.onload = function () {
+      var ok = false;
+      try { ok = !!next.contentDocument.querySelector(".transit"); } catch (e) {}
+      if (!ok) { next.remove(); offline.hidden = false; return; }
+      setTimeout(function () {
+        next.className = "";
+        next.removeAttribute("aria-hidden");
+        Array.prototype.slice.call(stage.children).forEach(function (old) { if (old !== next) old.remove(); });
+        offline.hidden = true;
+      }, 400);
+    };
+    stage.appendChild(next);
+  }
+
+  // Refresh on the :00 and :30 marks so the clock rolls over on time.
+  function schedule() {
+    setTimeout(function () { refresh(); schedule(); }, EVERY - (Date.now() % EVERY) + 250);
+  }
+
+  window.addEventListener("resize", fit);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) refresh(); });
+  fit();
+  refresh();
+  schedule();
+</script>
+</body>
+</html>

@@ -3,6 +3,11 @@
 // Serves the app at / and a small JSON API under /api. After each change the
 // frame is re-rendered (debounced), so out/frame-bw.png stays current.
 //
+// For a tablet:
+//   GET /board       the board as a live web page, scaled to the screen and
+//                    refreshed every 30 seconds (same template as the image)
+//   GET /board/frame one copy of the board at 600x800, which /board embeds
+//
 // For the Kindle:
 //   GET /frame.png   the latest rendered frame (8-bit greyscale, as eips needs)
 //   GET /kindle      a bare page showing the frame and reloading every minute,
@@ -21,7 +26,9 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { networkInterfaces } from "node:os";
 import sharp from "sharp";
+import { getDepartures } from "./cta.js";
 import { LISTS, newId, read, update } from "./kitchen-store.js";
+import { renderHtml } from "./template.js";
 
 const PORT = Number(process.env.PORT ?? 8080);
 const RENDER = process.env.RENDER !== "0";
@@ -34,14 +41,48 @@ const font = (pkg, weight) => require.resolve(`@fontsource/${pkg}/files/${pkg}-l
 const STATIC = {
   "/": ["web/index.html", "text/html; charset=utf-8"],
   "/manifest.webmanifest": ["web/manifest.webmanifest", "application/manifest+json"],
+  "/board": ["web/board.html", "text/html; charset=utf-8"],
   "/sortable.js": [require.resolve("sortablejs/Sortable.min.js"), "text/javascript"],
   "/fonts/serif-500.woff2": [font("ibm-plex-serif", 500), "font/woff2"],
   "/fonts/serif-700.woff2": [font("ibm-plex-serif", 700), "font/woff2"],
   "/fonts/mono-500.woff2": [font("ibm-plex-mono", 500), "font/woff2"],
+  "/fonts/mono-600.woff2": [font("ibm-plex-mono", 600), "font/woff2"],
   "/fonts/mono-700.woff2": [font("ibm-plex-mono", 700), "font/woff2"],
 };
 
 const FRAME = "out/frame-bw.png";
+
+// --- live board for tablets ---------------------------------------------------
+
+const BOARD_FONTS = [
+  ["IBM Plex Mono", "mono", [500, 600, 700]],
+  ["IBM Plex Serif", "serif", [500, 700]],
+].flatMap(([family, file, weights]) => weights.map((w) =>
+  `@font-face { font-family: "${family}"; src: url("/fonts/${file}-${w}.woff2") format("woff2"); font-weight: ${w}; }`,
+)).join("\n");
+
+// Departures are cached briefly so several screens refreshing every 30s
+// don't multiply CTA API calls. If CTA is unreachable, the last good result
+// is reused; it still counts down correctly since it holds arrival times.
+const DEPARTURES_TTL = 25_000;
+let departures = { at: 0, data: null };
+
+async function currentDepartures() {
+  if (Date.now() - departures.at < DEPARTURES_TTL) return departures.data;
+  try {
+    const config = JSON.parse(await readFile("config.json", "utf8"));
+    departures = { at: Date.now(), data: await getDepartures(config) };
+  } catch (err) {
+    console.warn(`departures: ${err.message}`);
+    if (!departures.data) throw new HttpError(503, "Departures unavailable");
+  }
+  return departures.data;
+}
+
+async function boardFrame() {
+  const [transit, kitchen] = await Promise.all([currentDepartures(), read()]);
+  return renderHtml({ transit, kitchen, now: new Date(), width: 600, height: 800, fonts: BOARD_FONTS });
+}
 
 // Kept to what the Kindle's old WebKit browser handles: no scripts, meta refresh,
 // and a timestamp on the image URL so it can't show a cached frame.
@@ -185,6 +226,7 @@ createServer(async (req, res) => {
     const match = pathname.match(API_PATH);
     if (match) return send(res, 200, await api(req, match[1], match[2]));
     if (pathname === "/icon.png") return send(res, 200, ICON, "image/png");
+    if (pathname === "/board/frame") return send(res, 200, await boardFrame(), "text/html; charset=utf-8");
     if (pathname === "/kindle") return send(res, 200, kindlePage(), "text/html; charset=utf-8");
     if (pathname === "/frame.png") {
       const png = await readFile(FRAME).catch(() => null);
