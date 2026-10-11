@@ -21,6 +21,10 @@
 //   PATCH  /api/:list/:id          { name?, qty? }         edit
 //   DELETE /api/:list/:id                                  remove
 //   PUT    /api/:list/order        { ids: [...] }          reorder
+//
+// Recipe ideas (see src/suggest.js); both respond with { suggestions }:
+//   GET    /api/suggestions        the last set made, or null
+//   POST   /api/suggestions        ask the model for a new set
 
 import { createServer } from "node:http";
 import { execFile } from "node:child_process";
@@ -30,6 +34,7 @@ import { networkInterfaces } from "node:os";
 import sharp from "sharp";
 import { getDepartures } from "./cta.js";
 import { LISTS, newId, read, update } from "./kitchen-store.js";
+import { lastSuggestions, suggest } from "./suggest.js";
 import { renderHtml } from "./template.js";
 import { renderWideHtml } from "./template-wide.js";
 
@@ -230,6 +235,11 @@ createServer(async (req, res) => {
   try {
     const match = pathname.match(API_PATH);
     if (match) return send(res, 200, await api(req, match[1], match[2]));
+    if (pathname === "/api/suggestions") {
+      if (req.method === "GET") return send(res, 200, { suggestions: await lastSuggestions() });
+      if (req.method === "POST") return send(res, 200, { suggestions: await suggest(await read()) });
+      throw new HttpError(405, "Method not allowed");
+    }
     if (pathname === "/icon.png") return send(res, 200, ICON, "image/png");
     if (pathname === "/board/frame" || pathname === "/board/wide/frame") {
       return send(res, 200, await boardFrame(pathname === "/board/wide/frame"), "text/html; charset=utf-8");

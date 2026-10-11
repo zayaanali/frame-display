@@ -24,10 +24,10 @@
   button, input { font: inherit; color: inherit; }
   button { background: none; border: none; cursor: pointer; }
 
-  /* Header: black band with the two lists as tabs, like the display's section bands. */
+  /* Header: black band with the two lists and recipe ideas as tabs, like the display's section bands. */
   header { position: sticky; top: 0; z-index: 2; background: var(--ink); color: var(--paper);
            padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px; }
-  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-width: 560px; margin: 0 auto;
+  .tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; max-width: 560px; margin: 0 auto;
           border: 2px solid var(--paper); border-radius: 10px; padding: 4px; }
   .tab { min-height: 44px; border-radius: 6px; font-weight: 700; font-size: 14px; letter-spacing: 0.08em; }
   .tab[aria-selected="true"] { background: var(--paper); color: var(--ink); }
@@ -71,6 +71,21 @@
            color: var(--muted); padding: 48px 0; }
   .hint { font-size: 12px; color: var(--muted); text-align: center; padding: 16px 0 0; letter-spacing: 0.02em; }
 
+  /* Ideas tab: recipes suggested from the TO USE list. */
+  .ideas { padding-top: 12px; }
+  .ideas .btn { width: 100%; height: 48px; border-radius: 10px; }
+  .ideas .btn:disabled { opacity: 0.5; }
+  .note { font-size: 12px; color: var(--muted); text-align: center; padding: 10px 0 4px; letter-spacing: 0.02em; }
+  .note.error { color: var(--ink); font-weight: 700; }
+  .recipe { border-bottom: 1px solid var(--line); padding: 16px 0; }
+  .recipe h3 { font-family: "Plex Serif", Georgia, serif; font-size: 21px; font-weight: 700; line-height: 1.2; }
+  .recipe .time { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: var(--muted); margin-top: 4px; }
+  .recipe dl { font-size: 13px; line-height: 1.45; margin-top: 10px; }
+  .recipe dt { font-weight: 700; letter-spacing: 0.06em; float: left; margin-right: 8px; }
+  .recipe dd { overflow-wrap: anywhere; }
+  .recipe .method { font-family: "Plex Serif", Georgia, serif; font-size: 16px; line-height: 1.4; margin-top: 10px; }
+  .recipe .btn { width: auto; height: 40px; margin-top: 12px; }
+
   /* Add bar pinned to the bottom, above the home indicator. */
   .add { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; background: var(--paper);
          border-top: 2px solid var(--ink); padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 10px); }
@@ -93,6 +108,7 @@
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" data-list="use" aria-selected="true">TO USE<span class="count" id="count-use"></span></button>
     <button class="tab" role="tab" data-list="make" aria-selected="false">TO MAKE<span class="count" id="count-make"></span></button>
+    <button class="tab" role="tab" data-list="ideas" aria-selected="false">IDEAS</button>
   </div>
 </header>
 
@@ -100,9 +116,14 @@
   <ul class="list" id="list"></ul>
   <p class="empty" id="empty" hidden></p>
   <p class="hint" id="hint" hidden>Drag ≡ to reorder · tap to edit · ○ when done</p>
+  <section class="ideas" id="ideas" hidden>
+    <button class="btn primary" id="suggest" type="button"></button>
+    <p class="note" id="ideas-note" hidden></p>
+    <div id="recipes"></div>
+  </section>
 </main>
 
-<div class="add">
+<div class="add" id="add">
   <form id="add-form" autocomplete="off">
     <input name="name" placeholder="Add…" enterkeyhint="done" required maxlength="80">
     <input name="qty" placeholder="Qty" enterkeyhint="done" maxlength="20">
@@ -131,8 +152,9 @@ let data = { use: [], make: [] };
 let current = "use";
 let editingId = null;   // while editing or dragging, incoming syncs don't redraw the list
 let dragging = false;
+let ideas = { saved: null, loading: false, error: "" };   // saved: last { at, use, recipes } from the server
 
-try { current = localStorage.getItem("tab") === "make" ? "make" : "use"; } catch {}
+try { current = ["make", "ideas"].find((t) => t === localStorage.getItem("tab")) ?? "use"; } catch {}
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
@@ -173,6 +195,14 @@ async function sync() {
 function render() {
   for (const list of ["use", "make"]) $(`count-${list}`).textContent = data[list].length || "";
   for (const tab of document.querySelectorAll(".tab")) tab.setAttribute("aria-selected", tab.dataset.list === current);
+  const onIdeas = current === "ideas";
+  $("ideas").hidden = !onIdeas;
+  $("add").hidden = listEl.hidden = onIdeas;
+  if (onIdeas) {
+    $("empty").hidden = $("hint").hidden = true;
+    renderIdeas();
+    return;
+  }
   const items = data[current];
   const cfg = LABELS[current];
   addName.placeholder = cfg.placeholder;
@@ -207,6 +237,69 @@ function editRow(item) {
     </form>
   </li>`;
 }
+
+// --- ideas ----------------------------------------------------------------------
+
+const useSignature = () => data.use.map((i) => (i.qty ? `${i.name} (${i.qty})` : i.name));
+
+function renderIdeas() {
+  const { saved, loading, error } = ideas;
+  const button = $("suggest");
+  button.disabled = loading || !data.use.length;
+  button.textContent = loading ? "THINKING…" : saved ? "SUGGEST AGAIN" : "SUGGEST RECIPES";
+
+  const stale = saved && saved.use.join("\n") !== useSignature().join("\n");
+  const made = saved && new Date(saved.at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+  const note = error ? error
+    : loading ? "Asking for ideas. This can take half a minute."
+      : !data.use.length ? "Add something to TO USE first."
+        : stale ? `TO USE has changed since these were made (${made}).`
+          : saved ? `Made ${made} from your TO USE list.`
+            : "Recipes based on your TO USE list, most urgent first.";
+  $("ideas-note").textContent = note;
+  $("ideas-note").className = error ? "note error" : "note";
+  $("ideas-note").hidden = false;
+
+  const planned = new Set(data.make.map((i) => i.name.toLowerCase()));
+  $("recipes").innerHTML = (saved?.recipes ?? []).map((r, i) => `<article class="recipe">
+    <h3>${esc(r.name)}</h3>
+    ${r.time ? `<p class="time">${esc(r.time).toUpperCase()}</p>` : ""}
+    <dl>
+      ${r.uses.length ? `<dt>USES</dt><dd>${esc(r.uses.join(", "))}</dd>` : ""}
+      ${r.needs.length ? `<dt>NEEDS</dt><dd>${esc(r.needs.join(", "))}</dd>` : ""}
+    </dl>
+    ${r.method ? `<p class="method">${esc(r.method)}</p>` : ""}
+    ${planned.has(r.name.toLowerCase())
+      ? '<button class="btn outline" type="button" disabled>IN TO MAKE</button>'
+      : `<button class="btn outline" type="button" data-recipe="${i}">+ TO MAKE</button>`}
+  </article>`).join("");
+}
+
+async function loadIdeas() {
+  try {
+    ideas.saved = (await api("GET", "suggestions")).suggestions;
+    if (current === "ideas") render();
+  } catch {}
+}
+
+$("suggest").addEventListener("click", async () => {
+  ideas = { ...ideas, loading: true, error: "" };
+  render();
+  try {
+    ideas.saved = (await api("POST", "suggestions")).suggestions;
+  } catch (err) {
+    ideas.error = err.message === "Failed to fetch" ? "Couldn't reach the fridge. Check Wi-Fi." : err.message;
+  }
+  ideas.loading = false;
+  render();
+});
+
+$("recipes").addEventListener("click", async (e) => {
+  const recipe = ideas.saved?.recipes[e.target.dataset.recipe];
+  if (!recipe) return;
+  await change("POST", "make", { name: recipe.name });
+  toast(`Added ${recipe.name} to TO MAKE`);
+});
 
 // --- toast with undo ------------------------------------------------------------
 
@@ -299,6 +392,7 @@ document.addEventListener("visibilitychange", () => document.visibilityState ===
 
 render();
 sync();
+loadIdeas();
 </script>
 </body>
 </html>

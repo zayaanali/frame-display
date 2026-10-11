@@ -12,5 +12,8 @@
   "LOCATION": {
     "lat": 41.8781,
     "lon": -87.6298
-  }
+  },
+  "OPENROUTER_API_KEY": "your-openrouter-key",
+  "OPENROUTER_MODEL": "openai/gpt-4.1-mini",
+  "OPENROUTER_FALLBACK_MODEL": ""
 }
