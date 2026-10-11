@@ -7,7 +7,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/frame-gen
+WorkingDirectory=%h/projects/frame-display
 ExecStart=/usr/bin/env node src/render.js
 Environment=TZ=America/Chicago
 TimeoutStartSec=90

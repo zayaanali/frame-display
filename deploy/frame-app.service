@@ -6,7 +6,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-WorkingDirectory=%h/frame-gen
+WorkingDirectory=%h/projects/frame-display
 ExecStart=/usr/bin/env node src/server.js
 Environment=PORT=8080
 # The display's clock uses the process time zone; servers often default to UTC.

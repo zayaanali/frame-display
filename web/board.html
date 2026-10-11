@@ -10,10 +10,12 @@
 <style>
   /* The board itself is /board/frame: the exact HTML the e-ink image is
      rendered from, at its native 600x800. This page scales it to fit the
-     screen and swaps in a fresh copy every 30 seconds. */
+     screen and swaps in a fresh copy every 30 seconds. Served at /board/wide
+     it shows the landscape colour board (/board/wide/frame, 1280x800). */
   html, body { margin: 0; height: 100%; background: #fff; overflow: hidden; }
-  #stage { position: absolute; left: 50%; top: 50%; width: 600px; height: 800px; }
-  iframe { position: absolute; inset: 0; width: 600px; height: 800px; border: 0; background: #fff; }
+  html.wide, html.wide body, html.wide iframe { background: #12161c; }
+  #stage { position: absolute; left: 50%; top: 50%; }
+  iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; background: #fff; }
   iframe.loading { visibility: hidden; }
   #offline { position: fixed; right: 12px; bottom: 12px; font: 700 12px/1 ui-monospace, monospace;
              letter-spacing: 0.08em; background: #000; color: #fff; padding: 6px 8px; border-radius: 4px; }
@@ -24,8 +26,17 @@
 <div id="stage"></div>
 <div id="offline" hidden>OFFLINE · SHOWING LAST UPDATE</div>
 <script>
-  var W = 600, H = 800, EVERY = 30000;
+  var WIDE = /^\/board\/wide\/?$/.test(location.pathname);
+  var W = WIDE ? 1280 : 600, H = 800, EVERY = 30000;
+  var FRAME = WIDE ? "/board/wide/frame" : "/board/frame";
   var stage = document.getElementById("stage");
+  stage.style.width = W + "px";
+  stage.style.height = H + "px";
+  if (WIDE) {
+    document.documentElement.className = "wide";
+    document.title = "Board (wide)";
+    document.querySelector('meta[name="theme-color"]').content = "#12161c";
+  }
   var offline = document.getElementById("offline");
 
   function fit() {
@@ -40,7 +51,7 @@
     var next = document.createElement("iframe");
     next.className = "loading";
     next.setAttribute("aria-hidden", "true");
-    next.src = "/board/frame?t=" + Date.now();
+    next.src = FRAME + "?t=" + Date.now();
     next.onload = function () {
       var ok = false;
       try { ok = !!next.contentDocument.querySelector(".transit"); } catch (e) {}

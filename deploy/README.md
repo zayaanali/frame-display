@@ -16,7 +16,7 @@ From the dev machine. This includes `config.json` (API keys) and
 
 ```sh
 rsync -av --exclude node_modules --exclude out --exclude .cache \
-  ~/Projects/frame-gen/ USER@SERVER:~/frame-gen/
+  ~/projects/frame-display/ USER@SERVER:~/projects/frame-display/
 ```
 
 ## 2. Install (on the server)
@@ -24,7 +24,7 @@ rsync -av --exclude node_modules --exclude out --exclude .cache \
 Needs Node 20 or newer.
 
 ```sh
-cd ~/frame-gen
+cd ~/projects/frame-display
 npm ci
 sudo npx playwright install-deps chromium   # system libraries Chromium needs
 npx playwright install chromium
@@ -45,7 +45,7 @@ systemctl --user enable --now frame-app.service frame-render.timer
 sudo loginctl enable-linger "$USER"         # keep them running when logged out and after reboot
 ```
 
-The units assume the project is at `~/frame-gen` and `node` is on the default
+The units assume the project is at `~/projects/frame-display` and `node` is on the default
 PATH. If Node came from nvm, replace `/usr/bin/env node` in the two
 `.service` files with the full path from `which node`.
 
@@ -81,6 +81,11 @@ template as the e-ink image, scaled to the screen, and refreshes every 30
 seconds (on the :00 and :30 marks). If the server can't be reached it keeps
 the last board up with an "OFFLINE" tag.
 
+For a tablet in landscape, open `http://SERVER:8080/board/wide` instead: a
+1280x800 colour layout with CTA line colours, departures on the left and the
+kitchen lists on the right. Preview it as an image with
+`node src/render.js --wide` (writes `out/frame-wide.png`).
+
 To keep it on screen:
 
 - iPad: Share → Add to Home Screen (opens without browser bars), turn
@@ -94,7 +99,7 @@ To keep it on screen:
 Re-run the rsync from step 1, then on the server:
 
 ```sh
-cd ~/frame-gen && npm ci && systemctl --user restart frame-app
+cd ~/projects/frame-display && npm ci && systemctl --user restart frame-app
 ```
 
 ## API usage

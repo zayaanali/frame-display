@@ -1,5 +1,7 @@
 // Renders the fridge display (transit + kitchen queue) to PNG for an e-ink panel.
 //   node src/render.js [--width 600] [--height 800] [--out out] [--sample]
+//   node src/render.js --wide [--sample]   colour landscape board (1280x800 by
+//                                          default) to frame-wide.png instead
 // Writes frame.png (what the browser drew) and frame-bw.png (thresholded to
 // pure black/white, ready to push to the display). frame-bw.png is stored as
 // 8-bit greyscale rather than a 1-bit palette PNG, which some viewers
@@ -15,18 +17,20 @@ import path from "node:path";
 import { getDepartures } from "./cta.js";
 import { getSampleDepartures } from "./sample.js";
 import { renderHtml } from "./template.js";
+import { renderWideHtml } from "./template-wide.js";
 import { load as loadKitchen } from "./kitchen-store.js";
 
 const { values: args } = parseArgs({
   options: {
-    width: { type: "string", default: "600" },
-    height: { type: "string", default: "800" },
+    width: { type: "string" },
+    height: { type: "string" },
     out: { type: "string", default: "out" },
     sample: { type: "boolean", default: false },
+    wide: { type: "boolean", default: false },
   },
 });
-const width = Number(args.width);
-const height = Number(args.height);
+const width = Number(args.width ?? (args.wide ? 1280 : 600));
+const height = Number(args.height ?? 800);
 
 const require = createRequire(import.meta.url);
 const face = (family, pkg, weight) => {
@@ -43,10 +47,10 @@ const transit = args.sample
   ? await getSampleDepartures(now)
   : await getDepartures(JSON.parse(await readFile("config.json", "utf8")));
 const kitchen = await loadKitchen();
-const html = renderHtml({ transit, kitchen, now, width, height, fonts });
+const html = (args.wide ? renderWideHtml : renderHtml)({ transit, kitchen, now, width, height, fonts });
 
 await mkdir(args.out, { recursive: true });
-const htmlPath = path.resolve(args.out, "frame.html");
+const htmlPath = path.resolve(args.out, args.wide ? "frame-wide.html" : "frame.html");
 await writeFile(htmlPath, html);
 
 const browser = await chromium.launch();
@@ -55,6 +59,13 @@ await page.goto(pathToFileURL(htmlPath).href);
 await page.evaluate(() => document.fonts.ready);
 const png = await page.screenshot({ type: "png" });
 await browser.close();
+
+if (args.wide) {
+  const widePath = path.join(args.out, "frame-wide.png");
+  await writeAtomic(widePath, png);
+  console.log(`wrote ${widePath} (${width}x${height})`);
+  process.exit(0);
+}
 
 // Write to a temp file and rename, so a viewer never opens a half-written image.
 async function writeAtomic(file, buffer) {

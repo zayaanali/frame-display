@@ -7,6 +7,8 @@
 //   GET /board       the board as a live web page, scaled to the screen and
 //                    refreshed every 30 seconds (same template as the image)
 //   GET /board/frame one copy of the board at 600x800, which /board embeds
+//   GET /board/wide  the landscape colour board (1280x800), same idea
+//   GET /board/wide/frame
 //
 // For the Kindle:
 //   GET /frame.png   the latest rendered frame (8-bit greyscale, as eips needs)
@@ -29,6 +31,7 @@ import sharp from "sharp";
 import { getDepartures } from "./cta.js";
 import { LISTS, newId, read, update } from "./kitchen-store.js";
 import { renderHtml } from "./template.js";
+import { renderWideHtml } from "./template-wide.js";
 
 const PORT = Number(process.env.PORT ?? 8080);
 const RENDER = process.env.RENDER !== "0";
@@ -42,6 +45,7 @@ const STATIC = {
   "/": ["web/index.html", "text/html; charset=utf-8"],
   "/manifest.webmanifest": ["web/manifest.webmanifest", "application/manifest+json"],
   "/board": ["web/board.html", "text/html; charset=utf-8"],
+  "/board/wide": ["web/board.html", "text/html; charset=utf-8"],
   "/sortable.js": [require.resolve("sortablejs/Sortable.min.js"), "text/javascript"],
   "/fonts/serif-500.woff2": [font("ibm-plex-serif", 500), "font/woff2"],
   "/fonts/serif-700.woff2": [font("ibm-plex-serif", 700), "font/woff2"],
@@ -79,9 +83,10 @@ async function currentDepartures() {
   return departures.data;
 }
 
-async function boardFrame() {
+async function boardFrame(wide) {
   const [transit, kitchen] = await Promise.all([currentDepartures(), read()]);
-  return renderHtml({ transit, kitchen, now: new Date(), width: 600, height: 800, fonts: BOARD_FONTS });
+  const [render, width] = wide ? [renderWideHtml, 1280] : [renderHtml, 600];
+  return render({ transit, kitchen, now: new Date(), width, height: 800, fonts: BOARD_FONTS });
 }
 
 // Kept to what the Kindle's old WebKit browser handles: no scripts, meta refresh,
@@ -226,7 +231,9 @@ createServer(async (req, res) => {
     const match = pathname.match(API_PATH);
     if (match) return send(res, 200, await api(req, match[1], match[2]));
     if (pathname === "/icon.png") return send(res, 200, ICON, "image/png");
-    if (pathname === "/board/frame") return send(res, 200, await boardFrame(), "text/html; charset=utf-8");
+    if (pathname === "/board/frame" || pathname === "/board/wide/frame") {
+      return send(res, 200, await boardFrame(pathname === "/board/wide/frame"), "text/html; charset=utf-8");
+    }
     if (pathname === "/kindle") return send(res, 200, kindlePage(), "text/html; charset=utf-8");
     if (pathname === "/frame.png") {
       const png = await readFile(FRAME).catch(() => null);

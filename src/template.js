@@ -5,16 +5,16 @@
 // Type: IBM Plex Serif for anything read at a distance (clock, routes, minute
 // tiles) and for list items; IBM Plex Mono for the small uppercase captions.
 
-const esc = (s) =>
+export const esc = (s) =>
   String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-const minsUntil = (iso, now) => Math.max(0, Math.round((new Date(iso) - now) / 60_000));
+export const minsUntil = (iso, now) => Math.max(0, Math.round((new Date(iso) - now) / 60_000));
 
 const ARROW = { North: "↑", South: "↓" };
 
 // Lists render every item; FIT_LISTS (run in the page once fonts load)
 // drops whatever doesn't fit its column and adds a "+ N more" line instead.
-const FIT_LISTS = `
+export const FIT_LISTS = `
   document.fonts.ready.then(() => {
     for (const ul of document.querySelectorAll(".list")) {
       const col = ul.closest(".col");
