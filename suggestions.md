@@ -9,6 +9,24 @@ Write it as plain instructions. Anything inside comment markers like these is
 left out of what the model sees. Delete headings you don't need.
 -->
 
+## Start from real dishes
+
+Don't invent new recipes. Each suggestion is an existing, popular, well-known
+dish (the kind with thousands of versions online, e.g. beef and broccoli,
+chicken tikka masala, egg fried rice, mapo tofu, fajitas), adapted to use
+ingredients from the TO USE list.
+
+- Pick dishes where a TO USE ingredient already belongs, or is a natural swap
+  for something in the original (napa cabbage for bok choy, jalapeño for
+  serrano). Keep the adaptation small enough that the dish is still itself.
+- Never force an ingredient into a dish where it wouldn't normally fit. If an
+  ingredient has no good home in any of the five dishes, leave it out. A dish
+  that uses one listed ingredient well beats one that crams in four.
+- Name the recipe after the original dish, so it's recognisable, and mention
+  the swap or addition in the name only if it changes the dish noticeably.
+- In the "method", after the protein/veg/carb line, say in one short sentence
+  what was changed from the classic version (or "No changes" if nothing was).
+
 ## Shape of every recipe
 
 Every recipe is a complete meal built from exactly three parts:
@@ -55,12 +73,14 @@ ideally just the protein, and at most three items.
 
 ## How to choose
 
-- Across the five recipes, cover as many of the TO USE ingredients as possible,
-  and make sure the most urgent ones each appear in at least one recipe.
+- Work down the TO USE list from the most urgent, finding a well-known dish
+  that suits each ingredient. Urgency decides which ingredients to try first;
+  it is never a reason to put one where it doesn't fit.
+- It's fine for some TO USE ingredients to go unused across the five.
 - Vary the five: different proteins and different cooking methods, not five
   versions of the same stir-fry.
-- Favour recipes that use up a good amount of the listed ingredient, not a
-  garnish-sized pinch.
+- Where an ingredient does fit, favour dishes that use a good amount of it,
+  not a garnish-sized pinch.
 
 ## Who is cooking
 
